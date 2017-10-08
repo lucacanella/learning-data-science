@@ -1,13 +1,15 @@
 # Learning data science
-## A little data science experiments
+Always wanted to learn data-science and machine learning, and here I'm trying.
+
+## A little data science experiments and data gather tests
 
 _Nothing interesting **yet**_
 
 ### twitter_test.py
 Gather some data from Twitter with python-twitter
 
-1. don't forget to ```pip install --user -Ur requirements.txt```
-    * on windows packages are found at ```C:\Users\%USERNAME%\AppData\Roaming\Python\Python35\site-packages```
+1. don't forget to ```pip install -Ur requirements.txt```
+    * use ```--user``` parameter to install locally
 2. create twitter_config.py file and specify twitter api parameters.
     * twitter_config.py file will be git ignored for obvious reasons.
 
