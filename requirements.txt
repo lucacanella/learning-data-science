@@ -1,1 +1,9 @@
 python-twitter
+numpy
+scipy
+scikit-learn
+matplotlib
+pandas
+selenium
+pypng
+pillow
