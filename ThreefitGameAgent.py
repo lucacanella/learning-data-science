@@ -6,6 +6,9 @@ from threading import Timer
 import selenium.common.exceptions as scExc
 import datetime
 import re
+from ThreefitAlgorithm import ThreefitAlgorithm
+import collections
+import sys
 
 """The Threefit game agent"""
 
@@ -15,11 +18,21 @@ class ThreefitGameAgent():
     """
 
     tables_buffer_size = 3
-    tables_buffer = []
+    """
+    :ivar tables_buffer:
+    :type collections.deque:
+    """
+    tables_buffer = None
     stop_procedure = False
     iterations = 0
     debug = 0
     browser = None
+
+    """
+    :ivar algorithm:
+    :type ThreefitAlgorithm:
+    """
+    algorithm = None
 
     """ regex to extract ball id """
     balltype_regex = re.compile('.*ball([0-9])\.gif')
@@ -31,13 +44,15 @@ class ThreefitGameAgent():
     def __init__(self, _webdriver: WebDriver, _tables_buffer_size: int = 3, _debug_level: int = 0):
         self.browser = _webdriver
         self.tables_buffer_size = _tables_buffer_size
+        self.tables_buffer = collections.deque(maxlen=self.tables_buffer_size)
         self.debug = _debug_level
         self.init_tables_buffer()
+        self.algorithm = ThreefitAlgorithm()
 
     def init_tables_buffer(self):
         """ Initializes the tables buffer with empty tables (all zeroes) """
         for i in range(self.tables_buffer_size):
-            tables_buffer = self.get_empty_table()
+            self.tables_buffer.append(self.get_empty_table())
 
     def get_empty_table(self):
         """
@@ -58,6 +73,8 @@ class ThreefitGameAgent():
         balls = self.browser.find_elements(By.XPATH, self.ball_images_xpath)
         for ball in balls:
             ballsrc = ball.get_attribute('src')
+            if type(ballsrc) is not str:
+                return None
             balltype = self.balltype_regex.match(ballsrc)
             table.append(int(balltype.group(1)))
         return table
@@ -78,12 +95,11 @@ class ThreefitGameAgent():
 
     def update_tables_buffer(self, table:list):
         """
-        Updates the tables buffer by prepending a new table to it
+        Updates the tables buffer by appending a new table to it
         :param table:
         :type table: list[int]
         """
-        self.tables_buffer.insert(0, table)
-        self.tables_buffer.pop()
+        self.tables_buffer.append(table)
 
     def play_game(self):
         """
@@ -100,25 +116,34 @@ class ThreefitGameAgent():
                 if self.debug > 0:
                     print('Game ended.')
                 self.stop_procedure = True
-                iterations = 0
         except scExc.NoAlertPresentException:
             # exception occurred, this means no alert has been show, we're playing
-            iterations += 1
+            self.iterations += 1
             table = self.read_game_table()
-            self.update_tables_buffer(table)
-            action = self.feed_algorithm_and_get_action()
-            self.perform_action(action)
-            if self.debug > 1:
-                self.print_game_table(table)
-            if self.debug > 0 and (iterations % 50 == 0):
-                print(' (', iterations, ') @ ', datetime.datetime.now())
+            if table:
+                self.update_tables_buffer(table)
+                action = self.feed_algorithm_and_get_action()
+                self.perform_action(action)
+                if self.debug > 1:
+                    self.print_game_table(table)
+                if self.debug > 0 and (self.iterations % 25 == 0):
+                    print(' (', self.iterations, ') @ ', datetime.datetime.now())
+                    self.algorithm.print_current_state()
+            else:
+                print('No table found, stopped procedure.')
+                self.stop_procedure = True
         except scExc.WebDriverException:
             self.stop_procedure = True
+        except TypeError:
+            #usually thrown when game ends but for some reason an alert is not yet present: just print the message and pass
+            print(' *** Exception occurred: %s' % sys.exc_info()[0])
+            pass
 
     def start_game_loop(self):
         """
         Starts game loop executing the play_game procedure every 0.1 seconds
         """
+        self.algorithm.init_algorithm()
         while not self.stop_procedure:
             timer = Timer(0.1, self.play_game)
             timer.start()
@@ -142,4 +167,10 @@ class ThreefitGameAgent():
         :returns: the action to perform ('l' for left, 'r' for right, 'd' for down, '' to stand still)
         :rtype: string
         """
-        return ''
+        if len(self.tables_buffer) > 0:
+            table = self.tables_buffer[0]
+            self.algorithm.feed_table(table)
+            action = self.algorithm.iterate_for_next_action()
+            return action
+        else:
+            return ''

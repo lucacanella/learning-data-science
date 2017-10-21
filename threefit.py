@@ -4,7 +4,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import wait
 from selenium.webdriver.support import expected_conditions as exp
-import ThreefitGameAgent
+from ThreefitGameAgent import ThreefitGameAgent
 
 if __name__ == '__main__':
     #Start the game by opening the browser and looping the learning procedure.
@@ -19,6 +19,14 @@ if __name__ == '__main__':
     wait.WebDriverWait(browser, 3, 0.1).until(
         exp.presence_of_element_located((By.XPATH, "/html/body/form/div/table[2]"))
     )
+    wait.WebDriverWait(browser, 3, 0.1).until(
+        exp.visibility_of_element_located((By.XPATH, '/html/body/form/div/table[1]/tbody/tr[2]/td[3]/input'))
+    )
+
+    #set game difficulty to 6
+    diff_plus_button = browser.find_element(By.XPATH, '/html/body/form/div/table[1]/tbody/tr[2]/td[3]/input')
+    diff_plus_button.click()
+    diff_plus_button.click()
 
     # game starts on his own we look at the table every 0.1 seconds
     agent = ThreefitGameAgent(_webdriver=browser, _tables_buffer_size=3, _debug_level=1)
