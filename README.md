@@ -48,5 +48,11 @@ A couple of tests with Selenium on Python, ref: ```https://pypi.python.org/pypi/
 
 Chrome driver is required (ie. put chromedriver.exe in local folder), see @ http://www.seleniumhq.org/download/.
 
-####Currently broken working on image crop and save...
+#### Currently broken working on image crop and save...
+
+### threefit.py
+
+Just trying to make my computer play a simple online game.
+
+### Not working yet.
  

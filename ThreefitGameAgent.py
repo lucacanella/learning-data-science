@@ -41,6 +41,9 @@ class ThreefitGameAgent():
     """ selector for balls on the table """
     ball_images_xpath = '/html/body/form/div/table[2]/tbody/tr/td/img'
 
+    """ Actions map: maps an action id to the method that implements it. """
+    actions_switcher = {}
+
     def __init__(self, _webdriver: WebDriver, _tables_buffer_size: int = 3, _debug_level: int = 0):
         self.browser = _webdriver
         self.tables_buffer_size = _tables_buffer_size
@@ -48,6 +51,23 @@ class ThreefitGameAgent():
         self.debug = _debug_level
         self.init_tables_buffer()
         self.algorithm = ThreefitAlgorithm()
+        self.actions_switcher = {
+            0: self.action_left,
+            1: self.action_down,
+            2: self.action_right
+        }
+
+    def action_left(self):
+        self.browser.find_element(By.XPATH, '/html/body/form/div/table[3]/tbody/tr/td[1]/input').click()
+        pass
+
+    def action_down(self):
+        self.browser.find_element(By.XPATH, '/html/body/form/div/table[3]/tbody/tr/td[2]/input').click()
+        pass
+
+    def action_right(self):
+        self.browser.find_element(By.XPATH, '/html/body/form/div/table[3]/tbody/tr/td[2]/input').click()
+        pass
 
     def init_tables_buffer(self):
         """ Initializes the tables buffer with empty tables (all zeroes) """
@@ -72,11 +92,17 @@ class ThreefitGameAgent():
         table = []
         balls = self.browser.find_elements(By.XPATH, self.ball_images_xpath)
         for ball in balls:
-            ballsrc = ball.get_attribute('src')
-            if type(ballsrc) is not str:
-                return None
-            balltype = self.balltype_regex.match(ballsrc)
-            table.append(int(balltype.group(1)))
+            try:
+                ballsrc = ball.get_attribute('src')
+                if type(ballsrc) is not str:
+                    return None
+                balltype = self.balltype_regex.match(ballsrc)
+                table.append(int(balltype.group(1)))
+            except scExc.UnexpectedAlertPresentException:
+                pass
+            except:
+                print(' *** Exception occurred while reading table: %s' % sys.exc_info()[0])
+                pass
         return table
 
     def print_game_table(self, table: list):
@@ -115,7 +141,7 @@ class ThreefitGameAgent():
             if self.browser.switch_to.alert.text:
                 if self.debug > 0:
                     print('Game ended.')
-                self.stop_procedure = True
+                self.browser.switch_to.alert.accept()
         except scExc.NoAlertPresentException:
             # exception occurred, this means no alert has been show, we're playing
             self.iterations += 1
@@ -127,11 +153,12 @@ class ThreefitGameAgent():
                 if self.debug > 1:
                     self.print_game_table(table)
                 if self.debug > 0 and (self.iterations % 25 == 0):
-                    print(' (', self.iterations, ') @ ', datetime.datetime.now())
-                    self.algorithm.print_current_state()
+                    print('Iterations: (', self.iterations, ') @ %s, cost %f' % (datetime.datetime.now(), self.algorithm.floating_averaged_cost))
+                    #self.algorithm.print_current_state()
             else:
-                print('No table found, stopped procedure.')
-                self.stop_procedure = True
+                print('No table found.')
+        except OSError:
+            pass
         except scExc.WebDriverException:
             self.stop_procedure = True
         except TypeError:
@@ -145,7 +172,7 @@ class ThreefitGameAgent():
         """
         self.algorithm.init_algorithm()
         while not self.stop_procedure:
-            timer = Timer(0.1, self.play_game)
+            timer = Timer(0.05, self.play_game)
             timer.start()
             timer.join()
         try:
@@ -154,12 +181,19 @@ class ThreefitGameAgent():
             pass
 
 
-    def perform_action(self, action:str):
+    def perform_action(self, action:int):
         """
         Performs given action
-        :param action: the action the agent should perform on the game
-        :type action: str
+        :param action: the action the agent should perform on the game (0: left, 1: down, 2: right)
+        :type action: int
         """
+        try:
+            self.actions_switcher[action]()
+        except scExc.UnexpectedAlertPresentException:
+            pass
+        except:
+            print(' *** Exception occurred while trying to take action: %s' % sys.exc_info()[0])
+            pass
 
     def feed_algorithm_and_get_action(self):
         """

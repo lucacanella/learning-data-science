@@ -9,18 +9,24 @@ class ThreefitAlgorithm():
     """
 
     """
+    :ivar current_table: current game table (last fed)
+    :type current_table: list[int]
+    """
+    current_table = None
+
+    """
     :ivar n_current_state: Game state encoded as numpy array
-    :type numpy.ndarray
+    :type current_state: numpy.ndarray
     """
     current_state = None
 
     """
     :ivar encoded_table_size: The size of the encoded table (input size for the algorithm)
-    :type int:
+    :type encoded_table_size: int
     """
     encoded_table_size = None
 
-    learning_rate = 0.015
+    learning_rate = 0.02
 
     hidden_units_num_1 = 36
     hidden_units_num_2 = 10
@@ -46,6 +52,16 @@ class ThreefitAlgorithm():
     tf_predict = None
 
     iteration_no = 0
+
+    last_prediction = None
+
+    """
+    :ivar column_heights: Calculated height of each column, starting from the botton until the first empty cell.
+    :type columne_heights: list[int]
+    """
+    column_heights = None
+
+    floating_averaged_cost = 0
 
     def init_algorithm(self):
         # each state counts 36 cells encoded with 3 integers (so 36 * 3)
@@ -82,6 +98,10 @@ class ThreefitAlgorithm():
 
         self.iteration_no = 0
 
+        self.last_column_heights = [ 0, 0, 0 ]
+
+        self.floating_averaged_cost = 0
+
     def feed_table(self, table):
         """
         Updates status by feed a newly acquired game table.
@@ -103,19 +123,78 @@ class ThreefitAlgorithm():
             for i in range(3):
                 self.current_state[state_index+i] = encoded[i]
             state_index += 3
+        self.current_table = table
 
     def iterate_for_next_action(self):
         if self.iteration_no > 0:
-            self.feedback([[0,0,1]])
-        prediction = self.tf_predict.eval({self.tf_input: self.current_state.reshape(-1, self.encoded_table_size)}, session=self.tf_session)
-        print('Prediction %d: %d' % (self.iteration_no, prediction))
+            columns_delta = self.calculate_column_heights_delta()
+            if columns_delta < 1:
+                feedback = self.positive_feedback_for_last_action()
+            elif columns_delta > 0:
+                feedback = self.negative_feedback_for_last_action()
+            else:
+                feedback = self.neutral_feedback_for_last_action()
+            self.feedback([feedback])
+        # convert to int because we may use it as an array index.
+        prediction = int(self.tf_predict.eval({self.tf_input: self.current_state.reshape(-1, self.encoded_table_size)}, session=self.tf_session))
+        #print('Prediction %d: %d' % (self.iteration_no, prediction))
         self.iteration_no += 1
+        self.last_prediction = prediction
         return prediction
+
+    def positive_feedback_for_last_action(self):
+        """
+        Last action had a positive outcome: encourage the algorithm to keep it up
+        :return feedback: list[float]
+        """
+        feedback = [0, 0, 0]
+        feedback[self.last_prediction] = 1.0
+        return feedback
+
+    def negative_feedback_for_last_action(self):
+        """
+        Last action had a negative outcome: punish the algorithm for that decision and tell it that it should have
+        choosen another action (with a 50% probability)
+        :return feedback: list[float]
+        """
+        feedback = [1.0, 1.0, 1.0]
+        feedback[self.last_prediction] = 0
+        return feedback
+
+    def neutral_feedback_for_last_action(self):
+        """
+        Last action had a neutral outcome: we want the algorithm to be a fast player so we'll give him a little anxiety
+        and apply a little punishment for its last decision by telling it that it should have chosen a better action
+        :return feedback: list[float]
+        """
+        feedback = [0.5, 0.5, 0.5]
+        feedback[self.last_prediction] = 0.0
+        return feedback
+
+    def calculate_column_heights_delta(self):
+        heights = [ 0, 0, 0, ]
+        rows = math.floor(len(self.current_table) / 3)
+        reverse_table = list(reversed(self.current_table))
+        keep_going = [ 1, 1, 1 ]
+        for i in range(rows):
+            for j in range(3):
+                cell_index = i*3+j
+                if keep_going[j] and reverse_table[cell_index] != 0:
+                    heights[j] += 1
+                else:
+                    keep_going[j] = 0
+            if sum(keep_going) < 1:
+                break
+        delta = sum(heights) - sum(self.last_column_heights)
+        #print('Heights [ %2d, %2d, %2d ] : delta -> %d '%(heights[0],heights[1],heights[2],delta))
+        self.last_column_heights = heights
+        return delta
+
 
     def feedback(self, feedback):
         algo_in = self.current_state.reshape(-1, self.encoded_table_size)
-        self.tf_session.run([self.optimizer, self.cost], feed_dict={self.tf_input: algo_in, self.tf_feedback: feedback})
-        return ''
+        _o, _cost = self.tf_session.run([self.optimizer, self.cost], feed_dict={self.tf_input: algo_in, self.tf_feedback: feedback})
+        self.floating_averaged_cost = self.floating_averaged_cost * 0.6 + 0.4 * _cost
 
     def print_current_state(self):
         print ('Current state:')
