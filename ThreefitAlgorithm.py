@@ -26,7 +26,7 @@ class ThreefitAlgorithm():
     """
     encoded_table_size = None
 
-    learning_rate = 0.02
+    learning_rate = 0.001
 
     hidden_units_num_1 = 36
     hidden_units_num_2 = 10
@@ -49,7 +49,7 @@ class ThreefitAlgorithm():
     tf_init = None
     tf_session = None
 
-    tf_predict = None
+    #tf_predict = None
 
     iteration_no = 0
 
@@ -84,8 +84,8 @@ class ThreefitAlgorithm():
         self.biases_output_weights = tf.Variable(tf.random_normal([self.output_units_num]))
 
         #init layers (computational graph)
-        self.input_l    = tf.nn.relu(tf.add(tf.matmul(self.tf_input, self.input_l_weights), self.biases_input_weights))
-        self.hidden_l_1 = tf.nn.relu(tf.add(tf.matmul(self.input_l, self.hidden_l_1_weights), self.biases_l1_weights))
+        self.input_l    = tf.nn.sigmoid(tf.add(tf.matmul(self.tf_input, self.input_l_weights), self.biases_input_weights))
+        self.hidden_l_1 = tf.nn.sigmoid(tf.add(tf.matmul(self.input_l, self.hidden_l_1_weights), self.biases_l1_weights))
         self.output_l = tf.nn.sigmoid(tf.add(tf.matmul(self.hidden_l_1, self.output_l_weights), self.biases_output_weights))
 
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.output_l, labels=self.tf_feedback))
@@ -94,13 +94,18 @@ class ThreefitAlgorithm():
 
         self.tf_session = tf.Session()
         self.tf_session.run(self.tf_init)
-        self.tf_predict = tf.arg_max(self.output_l, 1)
+        #self.tf_predict = tf.arg_max(self.output_l, 1)
 
         self.iteration_no = 0
 
         self.last_column_heights = [ 0, 0, 0 ]
 
         self.floating_averaged_cost = 0
+
+    def reset_game_status(self):
+        self.iteration_no = 0
+        self.last_column_heights = [ 0, 0, 0 ]
+        self.last_prediction = 1
 
     def feed_table(self, table):
         """
@@ -128,19 +133,22 @@ class ThreefitAlgorithm():
     def iterate_for_next_action(self):
         if self.iteration_no > 0:
             columns_delta = self.calculate_column_heights_delta()
-            if columns_delta < 1:
-                feedback = self.positive_feedback_for_last_action()
-            elif columns_delta > 0:
+            print('delta: %d - '%columns_delta, end='')
+            if columns_delta > 0:
                 feedback = self.negative_feedback_for_last_action()
-            else:
+            elif columns_delta == 0:
                 feedback = self.neutral_feedback_for_last_action()
+            else:
+                feedback = self.positive_feedback_for_last_action()
             self.feedback([feedback])
         # convert to int because we may use it as an array index.
-        prediction = int(self.tf_predict.eval({self.tf_input: self.current_state.reshape(-1, self.encoded_table_size)}, session=self.tf_session))
-        #print('Prediction %d: %d' % (self.iteration_no, prediction))
+        #prediction = self.output_l.eval({self.tf_input: self.current_state.reshape(-1, self.encoded_table_size)}, session=self.tf_session)
+        prediction = self.tf_session.run(self.output_l, feed_dict={self.tf_input: self.current_state.reshape(-1, self.encoded_table_size)})
+        prediction_idx = np.argmax(prediction)
+        print('Prediction: (%d): %d - ' % (self.iteration_no, prediction_idx), prediction)
         self.iteration_no += 1
-        self.last_prediction = prediction
-        return prediction
+        self.last_prediction = prediction_idx
+        return prediction_idx
 
     def positive_feedback_for_last_action(self):
         """
@@ -149,6 +157,7 @@ class ThreefitAlgorithm():
         """
         feedback = [0, 0, 0]
         feedback[self.last_prediction] = 1.0
+        print('Positive feedback on %d: '%self.last_prediction, feedback)
         return feedback
 
     def negative_feedback_for_last_action(self):
@@ -157,8 +166,9 @@ class ThreefitAlgorithm():
         choosen another action (with a 50% probability)
         :return feedback: list[float]
         """
-        feedback = [1.0, 1.0, 1.0]
-        feedback[self.last_prediction] = 0
+        feedback = [0.45, 0.0, 0.45]
+        feedback[self.last_prediction] = 0.1
+        print ('Negative feedback[on %d]: '%self.last_prediction, feedback)
         return feedback
 
     def neutral_feedback_for_last_action(self):
@@ -167,8 +177,9 @@ class ThreefitAlgorithm():
         and apply a little punishment for its last decision by telling it that it should have chosen a better action
         :return feedback: list[float]
         """
-        feedback = [0.5, 0.5, 0.5]
-        feedback[self.last_prediction] = 0.0
+        feedback = [0.2, 0.6, 0.2]
+        feedback[self.last_prediction] = 0.1
+        print('Neutral feedback[on %d]: '%self.last_prediction, feedback)
         return feedback
 
     def calculate_column_heights_delta(self):
@@ -190,11 +201,10 @@ class ThreefitAlgorithm():
         self.last_column_heights = heights
         return delta
 
-
     def feedback(self, feedback):
         algo_in = self.current_state.reshape(-1, self.encoded_table_size)
         _o, _cost = self.tf_session.run([self.optimizer, self.cost], feed_dict={self.tf_input: algo_in, self.tf_feedback: feedback})
-        self.floating_averaged_cost = self.floating_averaged_cost * 0.6 + 0.4 * _cost
+        self.floating_averaged_cost = self.floating_averaged_cost * 0.7 + 0.3 * _cost
 
     def print_current_state(self):
         print ('Current state:')

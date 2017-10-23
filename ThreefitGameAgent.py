@@ -140,6 +140,7 @@ class ThreefitGameAgent():
             # if next call doesn't rise an exception it means we have an alert in the browser (game has finished)
             if self.browser.switch_to.alert.text:
                 if self.debug > 0:
+                    self.algorithm.reset_game_status()
                     print('Game ended.')
                 self.browser.switch_to.alert.accept()
         except scExc.NoAlertPresentException:
