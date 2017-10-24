@@ -144,6 +144,8 @@ class ThreefitGameAgent():
                     print('Game ended.')
                 self.browser.switch_to.alert.accept()
         except scExc.NoAlertPresentException:
+            if self.debug > 0 and (self.iterations % 25 == 0):
+                print('Iterations: (', self.iterations,') @ %s, cost %f' % (datetime.datetime.now(), self.algorithm.floating_averaged_cost))
             # exception occurred, this means no alert has been show, we're playing
             self.iterations += 1
             table = self.read_game_table()
@@ -153,9 +155,6 @@ class ThreefitGameAgent():
                 self.perform_action(action)
                 if self.debug > 1:
                     self.print_game_table(table)
-                if self.debug > 0 and (self.iterations % 25 == 0):
-                    print('Iterations: (', self.iterations, ') @ %s, cost %f' % (datetime.datetime.now(), self.algorithm.floating_averaged_cost))
-                    #self.algorithm.print_current_state()
             else:
                 print('No table found.')
         except OSError:

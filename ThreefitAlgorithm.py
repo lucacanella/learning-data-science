@@ -54,6 +54,7 @@ class ThreefitAlgorithm():
     iteration_no = 0
 
     last_prediction = None
+    last_prediction_idx = None
 
     """
     :ivar column_heights: Calculated height of each column, starting from the botton until the first empty cell.
@@ -105,7 +106,8 @@ class ThreefitAlgorithm():
     def reset_game_status(self):
         self.iteration_no = 0
         self.last_column_heights = [ 0, 0, 0 ]
-        self.last_prediction = 1
+        self.last_prediction = None
+        self.last_prediction_idx = None
 
     def feed_table(self, table):
         """
@@ -131,7 +133,7 @@ class ThreefitAlgorithm():
         self.current_table = table
 
     def iterate_for_next_action(self):
-        if self.iteration_no > 0:
+        if self.iteration_no > 0 and self.last_prediction is not None:
             columns_delta = self.calculate_column_heights_delta()
             print('delta: %d - '%columns_delta, end='')
             if columns_delta > 0:
@@ -145,20 +147,29 @@ class ThreefitAlgorithm():
         #prediction = self.output_l.eval({self.tf_input: self.current_state.reshape(-1, self.encoded_table_size)}, session=self.tf_session)
         prediction = self.tf_session.run(self.output_l, feed_dict={self.tf_input: self.current_state.reshape(-1, self.encoded_table_size)})
         prediction_idx = np.argmax(prediction)
-        print('Prediction: (%d): %d - ' % (self.iteration_no, prediction_idx), prediction)
+        print('Prediction: %d - ' % prediction_idx, prediction, end=' - ')
         self.iteration_no += 1
-        self.last_prediction = prediction_idx
+        self.last_prediction = prediction
+        self.last_prediction_idx = prediction_idx
         return prediction_idx
+
+    def adjust_feedback(self, feedback):
+        tsum = sum(feedback)
+        if tsum == 0:
+            tsum = 1
+        return [v/tsum for v in feedback]
 
     def positive_feedback_for_last_action(self):
         """
         Last action had a positive outcome: encourage the algorithm to keep it up
         :return feedback: list[float]
         """
-        feedback = [0, 0, 0]
-        feedback[self.last_prediction] = 1.0
-        print('Positive feedback on %d: '%self.last_prediction, feedback)
-        return feedback
+        last_decision = self.last_prediction_idx
+        feedback = [(v / 3) for v in self.last_prediction[0]]
+        feedback[last_decision] = self.last_prediction[0, last_decision] * 3
+        adjusted_feedback = self.adjust_feedback(feedback)
+        print('Positive feedback on %d: '%last_decision, adjusted_feedback)
+        return adjusted_feedback
 
     def negative_feedback_for_last_action(self):
         """
@@ -166,10 +177,12 @@ class ThreefitAlgorithm():
         choosen another action (with a 50% probability)
         :return feedback: list[float]
         """
-        feedback = [0.45, 0.0, 0.45]
-        feedback[self.last_prediction] = 0.1
-        print ('Negative feedback[on %d]: '%self.last_prediction, feedback)
-        return feedback
+        last_decision = self.last_prediction_idx
+        feedback = [(v * 2) for v in self.last_prediction[0]]
+        feedback[last_decision] = self.last_prediction[0, last_decision] / 3
+        adjusted_feedback = self.adjust_feedback(feedback)
+        print ('Negative feedback[on %d]: '%last_decision, adjusted_feedback)
+        return adjusted_feedback
 
     def neutral_feedback_for_last_action(self):
         """
@@ -177,10 +190,12 @@ class ThreefitAlgorithm():
         and apply a little punishment for its last decision by telling it that it should have chosen a better action
         :return feedback: list[float]
         """
-        feedback = [0.2, 0.6, 0.2]
-        feedback[self.last_prediction] = 0.1
-        print('Neutral feedback[on %d]: '%self.last_prediction, feedback)
-        return feedback
+        last_decision = self.last_prediction_idx
+        feedback = [(v * 1.8) for v in self.last_prediction[0]]
+        feedback[last_decision] = self.last_prediction[0, last_decision] / 2
+        adjusted_feedback = self.adjust_feedback(feedback)
+        print('Neutral feedback[on %d]: '%last_decision, adjusted_feedback)
+        return adjusted_feedback
 
     def calculate_column_heights_delta(self):
         heights = [ 0, 0, 0, ]
