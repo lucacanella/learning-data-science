@@ -57,6 +57,9 @@ class ThreefitGameAgent():
             2: self.action_right
         }
 
+    def quitting(self):
+        self.algorithm.save_model()
+
     def action_left(self):
         self.browser.find_element(By.XPATH, '/html/body/form/div/table[3]/tbody/tr/td[1]/input').click()
         pass
@@ -161,6 +164,7 @@ class ThreefitGameAgent():
             pass
         except scExc.WebDriverException:
             self.stop_procedure = True
+            self.quitting()
         except TypeError:
             #usually thrown when game ends but for some reason an alert is not yet present: just print the message and pass
             print(' *** Exception occurred: %s' % sys.exc_info()[0])

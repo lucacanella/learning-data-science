@@ -1,3 +1,4 @@
+import os.path
 import math
 import numpy as np
 import tensorflow as tf
@@ -64,6 +65,9 @@ class ThreefitAlgorithm():
 
     floating_averaged_cost = 0
 
+    model_file_name = "./model.ckpt"
+    tf_saver = None
+
     def init_algorithm(self):
         # each state counts 36 cells encoded with 3 integers (so 36 * 3)
         self.encoded_table_size = 3 * 36
@@ -95,13 +99,23 @@ class ThreefitAlgorithm():
 
         self.tf_session = tf.Session()
         self.tf_session.run(self.tf_init)
-        #self.tf_predict = tf.arg_max(self.output_l, 1)
 
         self.iteration_no = 0
 
         self.last_column_heights = [ 0, 0, 0 ]
 
         self.floating_averaged_cost = 0
+        self.tf_saver = tf.train.Saver()
+
+        if os.path.isfile(self.model_file_name):
+            self.tf_saver.restore(self.tf_session, self.model_file_name)
+            print('TF Session restored.')
+        else:
+            print('NO TF Session to restore, starting a new model.')
+
+    def save_model(self):
+        self.tf_saver.save(self.tf_session, self.model_file_name)
+        print('TF Session saved @ ', self.model_file_name)
 
     def reset_game_status(self):
         self.iteration_no = 0
