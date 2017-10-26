@@ -1,5 +1,6 @@
-import os.path
+import glob
 import math
+import os
 import numpy as np
 import tensorflow as tf
 
@@ -65,7 +66,8 @@ class ThreefitAlgorithm():
 
     floating_averaged_cost = 0
 
-    model_file_name = "./model.ckpt"
+    model_file_dir = "./model"
+    model_file_name = "./model/model.ckpt"
     tf_saver = None
 
     def init_algorithm(self):
@@ -93,7 +95,7 @@ class ThreefitAlgorithm():
         self.hidden_l_1 = tf.nn.sigmoid(tf.add(tf.matmul(self.input_l, self.hidden_l_1_weights), self.biases_l1_weights))
         self.output_l = tf.nn.sigmoid(tf.add(tf.matmul(self.hidden_l_1, self.output_l_weights), self.biases_output_weights))
 
-        self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.output_l, labels=self.tf_feedback))
+        self.cost = tf.reduce_mean(tf.square(self.tf_feedback - self.output_l))
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.cost)
         self.tf_init = tf.global_variables_initializer()
 
@@ -107,15 +109,18 @@ class ThreefitAlgorithm():
         self.floating_averaged_cost = 0
         self.tf_saver = tf.train.Saver()
 
-        if os.path.isfile(self.model_file_name):
+        if not os.path.exists(self.model_file_dir):
+            os.makedirs(self.model_file_dir)
+
+        if len(glob.glob(self.model_file_name+'*')):
             self.tf_saver.restore(self.tf_session, self.model_file_name)
             print('TF Session restored.')
         else:
             print('NO TF Session to restore, starting a new model.')
 
     def save_model(self):
-        self.tf_saver.save(self.tf_session, self.model_file_name)
-        print('TF Session saved @ ', self.model_file_name)
+        saved_model_file_path = self.tf_saver.save(self.tf_session, self.model_file_name)
+        print('TF Session saved @ ', saved_model_file_path)
 
     def reset_game_status(self):
         self.iteration_no = 0
@@ -147,8 +152,8 @@ class ThreefitAlgorithm():
         self.current_table = table
 
     def iterate_for_next_action(self):
-        if self.iteration_no > 0 and self.last_prediction is not None:
-            columns_delta = self.calculate_column_heights_delta()
+        columns_delta = self.calculate_column_heights_delta()
+        if self.iteration_no > 1 and self.last_prediction is not None:
             print('delta: %d - '%columns_delta, end='')
             if columns_delta > 0:
                 feedback = self.negative_feedback_for_last_action()
@@ -158,7 +163,6 @@ class ThreefitAlgorithm():
                 feedback = self.positive_feedback_for_last_action()
             self.feedback([feedback])
         # convert to int because we may use it as an array index.
-        #prediction = self.output_l.eval({self.tf_input: self.current_state.reshape(-1, self.encoded_table_size)}, session=self.tf_session)
         prediction = self.tf_session.run(self.output_l, feed_dict={self.tf_input: self.current_state.reshape(-1, self.encoded_table_size)})
         prediction_idx = np.argmax(prediction)
         print('Prediction: %d - ' % prediction_idx, prediction, end=' - ')
@@ -179,8 +183,8 @@ class ThreefitAlgorithm():
         :return feedback: list[float]
         """
         last_decision = self.last_prediction_idx
-        feedback = [(v / 3) for v in self.last_prediction[0]]
-        feedback[last_decision] = self.last_prediction[0, last_decision] * 3
+        feedback = [0, 0, 0]
+        feedback[last_decision] = 1.0
         adjusted_feedback = self.adjust_feedback(feedback)
         print('Positive feedback on %d: '%last_decision, adjusted_feedback)
         return adjusted_feedback
@@ -192,8 +196,8 @@ class ThreefitAlgorithm():
         :return feedback: list[float]
         """
         last_decision = self.last_prediction_idx
-        feedback = [(v * 2) for v in self.last_prediction[0]]
-        feedback[last_decision] = self.last_prediction[0, last_decision] / 3
+        feedback = [0.8, 0.8, 0.8]
+        feedback[last_decision] = 0
         adjusted_feedback = self.adjust_feedback(feedback)
         print ('Negative feedback[on %d]: '%last_decision, adjusted_feedback)
         return adjusted_feedback

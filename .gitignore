@@ -2,3 +2,6 @@
 __pycache__
 twitter_config.py
 chromedriver.exe
+model/*
+checkpoint
+model.ckpt.*
