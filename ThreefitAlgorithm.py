@@ -30,8 +30,9 @@ class ThreefitAlgorithm():
 
     learning_rate = 0.001
 
-    hidden_units_num_1 = 36
-    hidden_units_num_2 = 10
+    hidden_units_num_1 = 72
+    hidden_units_num_2 = 36
+    hidden_units_num_3 = 36
     output_units_num   = 3
 
     input_l_weights    = None
@@ -83,17 +84,20 @@ class ThreefitAlgorithm():
         #init weights
         self.input_l_weights    = tf.Variable(tf.random_normal([self.encoded_table_size, self.hidden_units_num_1]))
         self.hidden_l_1_weights = tf.Variable(tf.random_normal([self.hidden_units_num_1, self.hidden_units_num_2]))
-        self.output_l_weights   = tf.Variable(tf.random_normal([self.hidden_units_num_2, self.output_units_num]))
+        self.hidden_l_2_weights = tf.Variable(tf.random_normal([self.hidden_units_num_2, self.hidden_units_num_3]))
+        self.output_l_weights   = tf.Variable(tf.random_normal([self.hidden_units_num_3, self.output_units_num]))
 
         #init biases
         self.biases_input_weights = tf.Variable(tf.random_normal([self.hidden_units_num_1]))
-        self.biases_l1_weights = tf.Variable(tf.random_normal([self.hidden_units_num_2]))
+        self.biases_l1_weights    = tf.Variable(tf.random_normal([self.hidden_units_num_2]))
+        self.biases_l2_weights    = tf.Variable(tf.random_normal([self.hidden_units_num_3]))
         self.biases_output_weights = tf.Variable(tf.random_normal([self.output_units_num]))
 
         #init layers (computational graph)
         self.input_l    = tf.nn.sigmoid(tf.add(tf.matmul(self.tf_input, self.input_l_weights), self.biases_input_weights))
         self.hidden_l_1 = tf.nn.sigmoid(tf.add(tf.matmul(self.input_l, self.hidden_l_1_weights), self.biases_l1_weights))
-        self.output_l = tf.nn.sigmoid(tf.add(tf.matmul(self.hidden_l_1, self.output_l_weights), self.biases_output_weights))
+        self.hidden_l_2 = tf.nn.sigmoid(tf.add(tf.matmul(self.hidden_l_1, self.hidden_l_2_weights), self.biases_l2_weights))
+        self.output_l = tf.nn.sigmoid(tf.add(tf.matmul(self.hidden_l_2, self.output_l_weights), self.biases_output_weights))
 
         self.cost = tf.reduce_mean(tf.square(self.tf_feedback - self.output_l))
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.cost)
@@ -172,9 +176,9 @@ class ThreefitAlgorithm():
         return prediction_idx
 
     def adjust_feedback(self, feedback):
-        tsum = sum(feedback)
+        tsum = sum(feedback) * 0.5
         if tsum == 0:
-            tsum = 1
+            tsum = 0.5
         return [v/tsum for v in feedback]
 
     def positive_feedback_for_last_action(self):
@@ -196,7 +200,7 @@ class ThreefitAlgorithm():
         :return feedback: list[float]
         """
         last_decision = self.last_prediction_idx
-        feedback = [0.8, 0.8, 0.8]
+        feedback = [0.75, 0.75, 0.75]
         feedback[last_decision] = 0
         adjusted_feedback = self.adjust_feedback(feedback)
         print ('Negative feedback[on %d]: '%last_decision, adjusted_feedback)
@@ -209,8 +213,8 @@ class ThreefitAlgorithm():
         :return feedback: list[float]
         """
         last_decision = self.last_prediction_idx
-        feedback = [(v * 1.8) for v in self.last_prediction[0]]
-        feedback[last_decision] = self.last_prediction[0, last_decision] / 2
+        feedback = [(v * 1.5) for v in self.last_prediction[0]]
+        feedback[last_decision] = self.last_prediction[0, last_decision] / 1.5
         adjusted_feedback = self.adjust_feedback(feedback)
         print('Neutral feedback[on %d]: '%last_decision, adjusted_feedback)
         return adjusted_feedback
