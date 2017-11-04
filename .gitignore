@@ -5,3 +5,4 @@ chromedriver.exe
 model/*
 checkpoint
 model.ckpt.*
+test.py

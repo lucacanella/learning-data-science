@@ -4,7 +4,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import wait
 from selenium.webdriver.support import expected_conditions as exp
-from ThreefitGameAgent import ThreefitGameAgent
+from ThreefitGameAgentV2 import ThreefitGameAgentV2
 
 if __name__ == '__main__':
     #Start the game by opening the browser and looping the learning procedure.
@@ -29,5 +29,5 @@ if __name__ == '__main__':
     diff_plus_button.click()
 
     # game starts on his own we look at the table every 0.1 seconds
-    agent = ThreefitGameAgent(_webdriver=browser, _tables_buffer_size=3, _debug_level=1)
+    agent = ThreefitGameAgentV2(_webdriver=browser, _debug_level=1)
     agent.start_game_loop()
