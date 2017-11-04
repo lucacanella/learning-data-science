@@ -193,7 +193,7 @@ class ThreefitAlgorithmV2():
         # convert to int because we may use it as an array index.
         prediction = self.tf_session.run(self.output_l, feed_dict={self.tf_input: current_state})
         prediction_idx = np.argmax(prediction)
-        print('Prediction: %d - ' % prediction_idx, prediction)
+        #print('Prediction: %d - ' % prediction_idx, prediction)
         self.iteration_no += 1
         self.latest_predictions.append(prediction[0])
         self.latest_predictions_idx.append(prediction_idx)
@@ -214,7 +214,7 @@ class ThreefitAlgorithmV2():
         if n < 1:
             return
         k = 1 / n
-        print("Giving positive feedback for %d actions" % n)
+        #print("Giving positive feedback for %d actions" % n)
         for i in range(n):
             f = 1 + (n - i) * k
             table = self.current_tables.pop()
@@ -223,7 +223,7 @@ class ThreefitAlgorithmV2():
             _output = [ j / f for j in prediction ]
             _output[decision] *= f * f
             adjusted_feedback = self.adjust_feedback(_output)
-            print('%2d) Positive feedback [%.3f] on %d: ' % (i, f, decision), adjusted_feedback)
+            #print('%2d) Positive feedback [%.3f] on %d: ' % (i, f, decision), adjusted_feedback)
             self.feedback(table, adjusted_feedback)
 
     def negative_feedback_for_latest_actions(self):
@@ -236,7 +236,7 @@ class ThreefitAlgorithmV2():
         if n < 1:
             return
         k = 1 / n
-        print("Giving negative feedback for %d actions" % n)
+        #print("Giving negative feedback for %d actions" % n)
         for i in range(n):
             f = 1 + (n - i) * k
             table = self.current_tables.pop()
@@ -245,7 +245,7 @@ class ThreefitAlgorithmV2():
             _output = [j * f for j in prediction]
             _output[decision] *= 1 / (f * f)
             adjusted_feedback = self.adjust_feedback(_output)
-            print('%2d) Negative feedback [%.3f] on %d: ' % (i, 1/f, decision), adjusted_feedback)
+            #print('%2d) Negative feedback [%.3f] on %d: ' % (i, 1/f, decision), adjusted_feedback)
             self.feedback(table, adjusted_feedback)
 
     def calculate_column_heights_delta(self, table):

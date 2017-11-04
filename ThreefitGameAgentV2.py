@@ -7,6 +7,7 @@ import selenium.common.exceptions as scExc
 import datetime
 import re
 from ThreefitAlgorithmV2 import ThreefitAlgorithmV2
+from collections import deque
 import sys
 
 """The Threefit game agent"""
@@ -20,6 +21,11 @@ class ThreefitGameAgentV2():
     iterations = 0
     debug = 0
     browser = None
+
+    max_scores = 5
+    scores = None
+    n_games_played = 0
+
 
     """
     :ivar algorithm:
@@ -38,6 +44,7 @@ class ThreefitGameAgentV2():
     actions_switcher = {}
 
     def __init__(self, _webdriver: WebDriver, _debug_level: int = 0):
+        self.scores = deque(maxlen=self.max_scores)
         self.browser = _webdriver
         self.debug = _debug_level
         self.algorithm = ThreefitAlgorithmV2()
@@ -69,6 +76,14 @@ class ThreefitGameAgentV2():
         :rtype: list[int]
         """
         return [0] * 36
+
+    def read_game_score(self):
+        score_input = self.browser.find_element(By.XPATH, self.score_xpath)
+        last_score = score_input.get_attribute('value')
+        if last_score is not None:
+            self.last_read_score = int(last_score)
+        else:
+            self.last_read_score = 0
 
     def read_game_table(self):
         """
@@ -121,6 +136,9 @@ class ThreefitGameAgentV2():
         except:
             pass
 
+    def game_ended(self):
+        self.scores.append(self.last_read_score)
+
     def play_game(self):
         """
         The play game procedure runs periodically every 0.1 seconds until we reach certain conditions.
@@ -133,15 +151,17 @@ class ThreefitGameAgentV2():
         try:
             # if next call doesn't rise an exception it means we have an alert in the browser (game has finished)
             if self.browser.switch_to.alert.text:
-                if self.debug > 0:
-                    self.algorithm.feedback_for_last_action(None) # game ended, send None as table
-                    print('Game ended.')
+                self.algorithm.feedback_for_last_action(None) # game ended, send None as table
+                self.game_ended()
+                self.n_games_played += 1;
+                print('Game %d ended. Average score over last %d games: %d' % (self.n_games_played, self.max_scores, sum(self.scores) / len(self.scores)))
                 self.browser.switch_to.alert.accept()
         except scExc.NoAlertPresentException:
             if self.debug > 0 and (self.iterations % 25 == 0):
                 print('Iterations: (', self.iterations,') @ %s, cost %f' % (datetime.datetime.now(), self.algorithm.floating_averaged_cost))
             # exception occurred, this means no alert has been show, we're playing
             self.iterations += 1
+            self.read_game_score()
             table = self.read_game_table()
             self.algorithm.feedback_for_last_action(table)
             if table:
