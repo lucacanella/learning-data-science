@@ -9,6 +9,8 @@ import re
 from ThreefitAlgorithmV2 import ThreefitAlgorithmV2
 from collections import deque
 import sys
+import glob
+import csv
 
 """The Threefit game agent"""
 
@@ -43,6 +45,26 @@ class ThreefitGameAgentV2():
     """ Actions map: maps an action id to the method that implements it. """
     actions_switcher = {}
 
+    last_read_score = 0
+
+    """
+    :ivar logfile:
+    :type logfile: TextIOWrapper[str]
+    """
+    logfile = None # type: TextIOWrapper[str]
+
+    """
+    :ivar logfile_csv:
+    :type logfile_csv: csv.writer
+    """
+    logfile_csv = None # type: csv.writer
+
+    """
+    :ivar logfile_name
+    :type logfile_name: str
+    """
+    logfile_name = r'training_log.csv' # type: str
+
     def __init__(self, _webdriver: WebDriver, _debug_level: int = 0):
         self.scores = deque(maxlen=self.max_scores)
         self.browser = _webdriver
@@ -53,19 +75,33 @@ class ThreefitGameAgentV2():
             1: self.action_down,
             2: self.action_right
         }
+        csv_file_exists = len(glob.glob(self.logfile_name))
+        self.logfile = open(self.logfile_name, 'at', newline='')
+        self.logfile_csv = csv.writer(self.logfile)
+        if not csv_file_exists:
+            fields = ['iterations', 'score', 'learning_rate']
+            self.logfile_csv.writerow(fields)
 
     def quitting(self):
         self.algorithm.save_model()
+        self.logfile.flush()
+        self.logfile.close()
 
     def action_left(self):
+        if self.debug > 1:
+            print('Left')
         self.browser.find_element(By.XPATH, '/html/body/form/div/table[3]/tbody/tr/td[1]/input').click()
         pass
 
     def action_down(self):
+        if self.debug > 1:
+            print('Down')
         self.browser.find_element(By.XPATH, '/html/body/form/div/table[3]/tbody/tr/td[2]/input').click()
         pass
 
     def action_right(self):
+        if self.debug > 1:
+            print('Right')
         self.browser.find_element(By.XPATH, '/html/body/form/div/table[3]/tbody/tr/td[2]/input').click()
         pass
 
@@ -138,6 +174,8 @@ class ThreefitGameAgentV2():
 
     def game_ended(self):
         self.scores.append(self.last_read_score)
+        self.logfile_csv.writerow([self.n_games_played, self.scores[-1], self.algorithm.get_current_learning_rate()])
+        self.logfile.flush()
 
     def play_game(self):
         """
@@ -154,7 +192,8 @@ class ThreefitGameAgentV2():
                 self.algorithm.feedback_for_last_action(None) # game ended, send None as table
                 self.game_ended()
                 self.n_games_played += 1;
-                print('Game %d ended. Average score over last %d games: %d' % (self.n_games_played, self.max_scores, sum(self.scores) / len(self.scores)))
+                print('Game %d ended. Average score over last %d games: %d, actual learning rate: %f' %
+                      (self.n_games_played, self.max_scores, sum(self.scores) / len(self.scores), self.algorithm.get_current_learning_rate()))
                 self.browser.switch_to.alert.accept()
         except scExc.NoAlertPresentException:
             if self.debug > 0 and (self.iterations % 25 == 0):
@@ -166,9 +205,10 @@ class ThreefitGameAgentV2():
             self.algorithm.feedback_for_last_action(table)
             if table:
                 action = self.algorithm.iterate(table)
-                self.perform_action(action)
-                if self.debug > 1:
-                    self.print_game_table(table)
+                if action is not None:
+                    self.perform_action(action)
+                    if self.debug > 1:
+                        self.print_game_table(table)
             else:
                 print('No table found.')
         except OSError:

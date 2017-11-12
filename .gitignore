@@ -6,3 +6,4 @@ model/*
 checkpoint
 model.ckpt.*
 test.py
+training_log.csv
