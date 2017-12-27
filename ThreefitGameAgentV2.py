@@ -84,6 +84,7 @@ class ThreefitGameAgentV2():
 
     def quitting(self):
         self.algorithm.save_model()
+        self.algorithm.close_session()
         self.logfile.flush()
         self.logfile.close()
 
@@ -120,6 +121,15 @@ class ThreefitGameAgentV2():
             self.last_read_score = int(last_score)
         else:
             self.last_read_score = 0
+
+    def read_game_score_from_alert_text(self, text):
+        score_match = re.search('Score: ([0-9]+)\.', text)
+        score = score_match.group(1)
+        if score is not None:
+            self.last_read_score = int(score)
+        else:
+            score = 0
+        return score
 
     def read_game_table(self):
         """
@@ -194,13 +204,13 @@ class ThreefitGameAgentV2():
                 self.n_games_played += 1;
                 print('Game %d ended. Average score over last %d games: %d, actual learning rate: %f' %
                       (self.n_games_played, self.max_scores, sum(self.scores) / len(self.scores), self.algorithm.get_current_learning_rate()))
+                self.read_game_score_from_alert_text(self.browser.switch_to.alert.text)
                 self.browser.switch_to.alert.accept()
         except scExc.NoAlertPresentException:
             if self.debug > 0 and (self.iterations % 25 == 0):
                 print('Iterations: (', self.iterations,') @ %s, cost %f' % (datetime.datetime.now(), self.algorithm.floating_averaged_cost))
             # exception occurred, this means no alert has been show, we're playing
             self.iterations += 1
-            self.read_game_score()
             table = self.read_game_table()
             self.algorithm.feedback_for_last_action(table)
             if table:
